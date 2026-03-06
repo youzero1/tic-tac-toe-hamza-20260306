@@ -1,0 +1,175 @@
+'O' ? '○' : ''}
+                </div>
+              ))}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                {game.playerX.username} vs {game.playerO.username}
+              </div>
+              <div className="text-muted text-sm">
+                {new Date(game.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+            <span className={`game-result-badge ${resultClass}`}>{resultBadge}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/game/page.tsx">
+'use client';
+
+import { useState, useCallback } from 'react';
+import PlayerForm from '@/components/PlayerForm';
+import Board from '@/components/Board';
+import GameStatus from '@/components/GameStatus';
+import ShareResult from '@/components/ShareResult';
+import {
+  createEmptyBoard,
+  checkWinner,
+  makeMove,
+  generateShareText,
+  BoardState,
+  GameResult,
+} from '@/lib/gameLogic';
+
+interface PlayerInfo {
+  id: number;
+  username: string;
+}
+
+type GamePhase = 'setup' | 'playing' | 'finished';
+
+interface MoveRecord {
+  player: string;
+  index: number;
+  board: BoardState;
+}
+
+export default function GamePage() {
+  const [phase, setPhase] = useState<GamePhase>('setup');
+  const [playerX, setPlayerX] = useState<PlayerInfo | null>(null);
+  const [playerO, setPlayerO] = useState<PlayerInfo | null>(null);
+  const [board, setBoard] = useState<BoardState>(createEmptyBoard());
+  const [currentPlayer, setCurrentPlayer] = useState<string>('X');
+  const [gameResult, setGameResult] = useState<GameResult | null>(null);
+  const [moves, setMoves] = useState<MoveRecord[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [shareText, setShareText] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  const handlePlayersReady = useCallback(
+    (px: PlayerInfo, po: PlayerInfo) => {
+      setPlayerX(px);
+      setPlayerO(po);
+      setBoard(createEmptyBoard());
+      setCurrentPlayer('X');
+      setGameResult(null);
+      setMoves([]);
+      setPhase('playing');
+      setError('');
+    },
+    []
+  );
+
+  const handleSquareClick = useCallback(
+    async (index: number) => {
+      if (gameResult || board[index]) return;
+
+      const newBoard = makeMove(board, index, currentPlayer);
+      if (!newBoard) return;
+
+      const moveRecord: MoveRecord = {
+        player: currentPlayer,
+        index,
+        board: newBoard,
+      };
+      const newMoves = [...moves, moveRecord];
+
+      setBoard(newBoard);
+      setMoves(newMoves);
+
+      const result = checkWinner(newBoard);
+
+      if (result.winner || result.isDraw) {
+        setGameResult(result);
+        setPhase('finished');
+
+        // Generate share text
+        const text = generateShareText(
+          playerX!.username,
+          playerO!.username,
+          result
+        );
+        setShareText(text);
+
+        // Save game to DB
+        setSaving(true);
+        try {
+          const winnerId = result.winner === 'X'
+            ? playerX!.id
+            : result.winner === 'O'
+            ? playerO!.id
+            : null;
+
+          await fetch('/api/games', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playerXId: playerX!.id,
+              playerOId: playerO!.id,
+              winnerId,
+              moves: newMoves.map((m) => ({ player: m.player, index: m.index })),
+              status: result.isDraw ? 'draw' : 'completed',
+            }),
+          });
+        } catch (e) {
+          console.error('Failed to save game', e);
+          setError('Game ended but failed to save result.');
+        } finally {
+          setSaving(false);
+        }
+      } else {
+        setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+      }
+    },
+    [board, currentPlayer, gameResult, moves, playerX, playerO]
+  );
+
+  const handleReset = useCallback(() => {
+    setBoard(createEmptyBoard());
+    setCurrentPlayer('X');
+    setGameResult(null);
+    setMoves([]);
+    setShareText('');
+    setError('');
+    setPhase('playing');
+  }, []);
+
+  const handleNewPlayers = useCallback(() => {
+    setPhase('setup');
+    setPlayerX(null);
+    setPlayerO(null);
+    setBoard(createEmptyBoard());
+    setCurrentPlayer('X');
+    setGameResult(null);
+    setMoves([]);
+    setShareText('');
+    setError('');
+  }, []);
+
+  return (
+    <div className="container">
+      <div className="page-header">
+        <h1 className="page-title">🎮 Play Game</h1>
+        <p className="page-subtitle">Two players, one board, ultimate glory.</p>
+      </div>
+
+      {phase === 'setup' && (
+        <PlayerForm onReady={handlePlayersReady} />
+      )}
+
+      {(phase
