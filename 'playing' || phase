@@ -1,0 +1,76 @@
+'finished') && playerX && playerO && (
+        <div className="board-container">
+          {/* Players bar */}
+          <div className="players-bar">
+            <div className={`player-chip x-player ${currentPlayer === 'X' && !gameResult ? 'active' : ''}`}>
+              <div className="avatar avatar-x">{playerX.username[0]}</div>
+              <span>{playerX.username}</span>
+              <span style={{ color: 'var(--x-color)', fontSize: '1.1rem' }}>✕</span>
+            </div>
+            <span className="vs-text">VS</span>
+            <div className={`player-chip o-player ${currentPlayer === 'O' && !gameResult ? 'active' : ''}`}>
+              <span style={{ color: 'var(--o-color)', fontSize: '1.1rem' }}>○</span>
+              <span>{playerO.username}</span>
+              <div className="avatar avatar-o">{playerO.username[0]}</div>
+            </div>
+          </div>
+
+          {/* Game Status */}
+          <GameStatus
+            currentPlayer={currentPlayer}
+            gameResult={gameResult}
+            playerX={playerX.username}
+            playerO={playerO.username}
+          />
+
+          {/* Board */}
+          <Board
+            board={board}
+            onSquareClick={handleSquareClick}
+            winningLine={gameResult?.winningLine || null}
+            disabled={!!gameResult}
+          />
+
+          {error && (
+            <p style={{ color: 'var(--danger)', fontSize: '0.9rem' }}>{error}</p>
+          )}
+
+          {saving && (
+            <div className="flex items-center gap-4">
+              <div className="spinner" />
+              <span className="text-muted text-sm">Saving game result...</span>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-4" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+            {phase === 'finished' && (
+              <button className="btn btn-primary" onClick={handleReset}>
+                🔄 Play Again
+              </button>
+            )}
+            <button className="btn btn-outline" onClick={handleNewPlayers}>
+              👥 Change Players
+            </button>
+          </div>
+
+          {/* Share Result */}
+          {phase === 'finished' && shareText && (
+            <ShareResult shareText={shareText} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config
