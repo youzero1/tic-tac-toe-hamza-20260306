@@ -1,0 +1,480 @@
+'O' ? '○' : '';
+
+  return (
+    <button className={classNames} onClick={onClick} disabled={disabled || !!value}>
+      {display}
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/Board.tsx">
+'use client';
+
+import Square from './Square';
+import { BoardState } from '@/lib/gameLogic';
+
+interface BoardProps {
+  board: BoardState;
+  onSquareClick: (index: number) => void;
+  winningLine: number[] | null;
+  disabled: boolean;
+}
+
+export default function Board({ board, onSquareClick, winningLine, disabled }: BoardProps) {
+  return (
+    <div className="board">
+      {board.map((value, index) => (
+        <Square
+          key={index}
+          value={value}
+          onClick={() => onSquareClick(index)}
+          isWinning={winningLine ? winningLine.includes(index) : false}
+          disabled={disabled}
+        />
+      ))}
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/GameStatus.tsx">
+'use client';
+
+import { GameResult } from '@/lib/gameLogic';
+
+interface GameStatusProps {
+  currentPlayer: string;
+  gameResult: GameResult | null;
+  playerX: string;
+  playerO: string;
+}
+
+export default function GameStatus({ currentPlayer, gameResult, playerX, playerO }: GameStatusProps) {
+  if (gameResult) {
+    if (gameResult.isDraw) {
+      return (
+        <div className="game-status">
+          <div className="result-text draw">🤝 It&apos;s a Draw!</div>
+        </div>
+      );
+    }
+
+    const winnerName = gameResult.winner === 'X' ? playerX : playerO;
+    return (
+      <div className="game-status">
+        <div className="result-text win">🎉 {winnerName} Wins!</div>
+      </div>
+    );
+  }
+
+  const currentName = currentPlayer === 'X' ? playerX : playerO;
+  const turnClass = currentPlayer === 'X' ? 'x-turn' : 'o-turn';
+
+  return (
+    <div className="game-status">
+      <div className={`turn-indicator ${turnClass}`}>
+        {currentPlayer === 'X' ? '✕' : '○'} {currentName}&apos;s Turn
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/PlayerForm.tsx">
+'use client';
+
+import { useState } from 'react';
+
+interface PlayerInfo {
+  id: number;
+  username: string;
+}
+
+interface PlayerFormProps {
+  onReady: (playerX: PlayerInfo, playerO: PlayerInfo) => void;
+}
+
+export default function PlayerForm({ onReady }: PlayerFormProps) {
+  const [usernameX, setUsernameX] = useState('');
+  const [usernameO, setUsernameO] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const nameX = usernameX.trim();
+    const nameO = usernameO.trim();
+
+    if (!nameX || !nameO) {
+      setError('Both player names are required.');
+      return;
+    }
+
+    if (nameX.toLowerCase() === nameO.toLowerCase()) {
+      setError('Players must have different usernames.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const [resX, resO] = await Promise.all([
+        fetch('/api/players', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: nameX }),
+        }),
+        fetch('/api/players', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: nameO }),
+        }),
+      ]);
+
+      const playerX: PlayerInfo = await resX.json();
+      const playerO: PlayerInfo = await resO.json();
+
+      if (!playerX.id || !playerO.id) {
+        setError('Failed to register players.');
+        return;
+      }
+
+      onReady(playerX, playerO);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card" style={{ maxWidth: '480px', margin: '0 auto' }}>
+      <h2 style={{ marginBottom: '20px', fontWeight: 700, textAlign: 'center' }}>
+        👥 Enter Player Names
+      </h2>
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label className="form-label">
+            Player ✕ <span style={{ color: 'var(--x-color)' }}>(X)</span>
+          </label>
+          <input
+            className="form-input"
+            type="text"
+            placeholder="Enter username..."
+            value={usernameX}
+            onChange={(e) => setUsernameX(e.target.value)}
+            maxLength={30}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">
+            Player ○ <span style={{ color: 'var(--o-color)' }}>(O)</span>
+          </label>
+          <input
+            className="form-input"
+            type="text"
+            placeholder="Enter username..."
+            value={usernameO}
+            onChange={(e) => setUsernameO(e.target.value)}
+            maxLength={30}
+          />
+        </div>
+        {error && (
+          <p style={{ color: 'var(--danger)', fontSize: '0.9rem', marginBottom: '12px' }}>
+            {error}
+          </p>
+        )}
+        <button className="btn btn-primary w-full" type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <span className="spinner" /> Setting up...
+            </>
+          ) : (
+            '🎮 Start Game'
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ShareResult.tsx">
+'use client';
+
+import { useState } from 'react';
+
+interface ShareResultProps {
+  shareText: string;
+}
+
+export default function ShareResult({ shareText }: ShareResultProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+      const textarea = document.createElement('textarea');
+      textarea.value = shareText;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleTweet = () => {
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <div className="card" style={{ maxWidth: '480px', width: '100%' }}>
+      <h3 style={{ marginBottom: '12px', fontWeight: 700 }}>📤 Share Result</h3>
+      <div className="share-box">{shareText}</div>
+      <div className="share-actions mt-4">
+        <button className="btn btn-primary btn-sm" onClick={handleCopy}>
+          {copied ? '✅ Copied!' : '📋 Copy'}
+        </button>
+        <button className="btn btn-outline btn-sm" onClick={handleTweet}>
+          🐦 Tweet
+        </button>
+      </div>
+      {copied && <div className="toast">Copied to clipboard!</div>}
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/Navbar.tsx">
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+export default function Navbar() {
+  const pathname = usePathname();
+
+  return (
+    <nav className="navbar">
+      <div className="navbar-inner">
+        <Link href="/" className="navbar-brand">
+          Tic Tac Toe
+        </Link>
+        <ul className="navbar-links">
+          <li>
+            <Link href="/" className={pathname === '/' ? 'active' : ''}>
+              🏠 Home
+            </Link>
+          </li>
+          <li>
+            <Link href="/game" className={pathname === '/game' ? 'active' : ''}>
+              🎮 Play
+            </Link>
+          </li>
+          <li>
+            <Link href="/leaderboard" className={pathname === '/leaderboard' ? 'active' : ''}>
+              🏆 Rankings
+            </Link>
+          </li>
+          <li>
+            <Link href="/profile" className={pathname === '/profile' ? 'active' : ''}>
+              👤 Profile
+            </Link>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  );
+}
+</file>
+
+<file path="src/components/Leaderboard.tsx">
+'use client';
+
+import { useState, useEffect } from 'react';
+
+interface LeaderboardEntry {
+  id: number;
+  username: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  total: number;
+  winPct: number;
+}
+
+export default function Leaderboard() {
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/leaderboard')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setEntries(data);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-center mt-8">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="empty-state">
+        <div className="empty-icon">🏆</div>
+        <p>No players yet. Be the first to play!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card">
+      <table className="leaderboard-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Player</th>
+            <th>W</th>
+            <th>L</th>
+            <th>D</th>
+            <th>Total</th>
+            <th>Win %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry, i) => {
+            const rank = i + 1;
+            const rankClass =
+              rank === 1
+                ? 'rank-1'
+                : rank === 2
+                ? 'rank-2'
+                : rank === 3
+                ? 'rank-3'
+                : 'rank-other';
+
+            return (
+              <tr key={entry.id}>
+                <td>
+                  <span className={`rank-badge ${rankClass}`}>{rank}</span>
+                </td>
+                <td style={{ fontWeight: 600 }}>{entry.username}</td>
+                <td style={{ color: 'var(--success)' }}>{entry.wins}</td>
+                <td style={{ color: 'var(--danger)' }}>{entry.losses}</td>
+                <td style={{ color: 'var(--warning)' }}>{entry.draws}</td>
+                <td>{entry.total}</td>
+                <td className="win-pct">{entry.winPct}%</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/GameHistory.tsx">
+'use client';
+
+import { useState, useEffect } from 'react';
+
+interface GameRecord {
+  id: number;
+  playerX: { id: number; username: string };
+  playerO: { id: number; username: string };
+  winner: { id: number; username: string } | null;
+  status: string;
+  moves: { player: string; index: number }[];
+  createdAt: string;
+  completedAt: string;
+}
+
+interface GameHistoryProps {
+  playerId: number;
+}
+
+export default function GameHistory({ playerId }: GameHistoryProps) {
+  const [games, setGames] = useState<GameRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/games?playerId=${playerId}&limit=50`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.games && Array.isArray(data.games)) {
+          setGames(data.games);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [playerId]);
+
+  if (loading) {
+    return (
+      <div className="text-center mt-4">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (games.length === 0) {
+    return (
+      <div className="empty-state">
+        <div className="empty-icon">📋</div>
+        <p>No games played yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h3 style={{ fontWeight: 700, fontSize: '1.2rem' }}>📋 Game History</h3>
+      {games.map((game) => {
+        let resultBadge: string;
+        let resultClass: string;
+
+        if (game.status === 'draw') {
+          resultBadge = 'Draw';
+          resultClass = 'badge-draw';
+        } else if (game.winner && game.winner.id === playerId) {
+          resultBadge = 'Win';
+          resultClass = 'badge-win';
+        } else {
+          resultBadge = 'Loss';
+          resultClass = 'badge-loss';
+        }
+
+        // Reconstruct mini board
+        const miniBoard: (string | null)[] = Array(9).fill(null);
+        game.moves.forEach((m) => {
+          miniBoard[m.index] = m.player;
+        });
+
+        return (
+          <div key={game.id} className="game-card">
+            <div className="mini-board">
+              {miniBoard.map((cell, i) => (
+                <div
+                  key={i}
+                  className={`mini-cell ${cell
