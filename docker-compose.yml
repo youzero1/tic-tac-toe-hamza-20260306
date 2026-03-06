@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  tic-tac-toe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/database.sqlite
+      - NEXT_PUBLIC_APP_NAME=Tic Tac Toe
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
+    volumes:
+      - tic_tac_toe_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  tic_tac_toe_data:
