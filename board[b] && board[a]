@@ -1,0 +1,84 @@
+board[c]) {
+      return {
+        winner: board[a] as 'X' | 'O',
+        isDraw: false,
+        winningLine: line,
+      };
+    }
+  }
+
+  const isDraw = board.every((cell) => cell !== null);
+  return {
+    winner: null,
+    isDraw,
+    winningLine: null,
+  };
+}
+
+export function getNextPlayer(currentPlayer: string): string {
+  return currentPlayer === 'X' ? 'O' : 'X';
+}
+
+export function makeMove(
+  board: BoardState,
+  index: number,
+  player: string
+): BoardState | null {
+  if (index < 0 || index > 8 || board[index] !== null) {
+    return null;
+  }
+  const newBoard = [...board];
+  newBoard[index] = player as CellValue;
+  return newBoard;
+}
+
+export function generateShareText(
+  playerXName: string,
+  playerOName: string,
+  result: GameResult
+): string {
+  let resultLine: string;
+  if (result.isDraw) {
+    resultLine = "It's a draw! 🤝";
+  } else if (result.winner === 'X') {
+    resultLine = `${playerXName} (✕) wins! 🎉`;
+  } else {
+    resultLine = `${playerOName} (○) wins! 🎉`;
+  }
+
+  return [
+    '🎮 Tic Tac Toe Result',
+    '━━━━━━━━━━━━━━━━━━━',
+    `✕ ${playerXName}  vs  ○ ${playerOName}`,
+    '',
+    resultLine,
+    '',
+    '#TicTacToe #Gaming',
+  ].join('\n');
+}
+</file>
+
+<file path="src/components/Square.tsx">
+'use client';
+
+import { CellValue } from '@/lib/gameLogic';
+
+interface SquareProps {
+  value: CellValue;
+  onClick: () => void;
+  isWinning: boolean;
+  disabled: boolean;
+}
+
+export default function Square({ value, onClick, isWinning, disabled }: SquareProps) {
+  const classNames = [
+    'square',
+    value === 'X' ? 'x-mark' : '',
+    value === 'O' ? 'o-mark' : '',
+    isWinning ? 'winning' : '',
+    disabled || value ? 'disabled' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const display = value
